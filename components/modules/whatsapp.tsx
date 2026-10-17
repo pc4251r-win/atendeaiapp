@@ -22,17 +22,23 @@ async function chamar(acao: 'conectar' | 'status' | 'desconectar'): Promise<Resp
 
 export function Whatsapp() {
   const { db, empresa, upsert, notify, session } = useData()
-  const atual: WhatsappConexao = db.whatsapp_conexoes[0] ?? {
-    id: uid(),
-    empresa_id: empresa.id,
-    api_provider: 'evolution_api',
-    instance_name: `atd-${empresa.id.slice(0, 8)}`,
-    display_phone_number: '',
-    status: 'desconectado',
-    qr_code_base64: '',
-    auto_resposta_ia: true,
-    updated_at: nowIso(),
-  }
+
+  // 🔧 Normaliza o registro vindo do banco: qr_code_base64 pode vir null do Supabase
+  const registroBanco = db.whatsapp_conexoes[0]
+  const atual: WhatsappConexao = registroBanco
+    ? { ...registroBanco, qr_code_base64: registroBanco.qr_code_base64 || '' }
+    : {
+        id: uid(),
+        empresa_id: empresa.id,
+        api_provider: 'evolution_api',
+        instance_name: `atd-${empresa.id.slice(0, 8)}`,
+        display_phone_number: '',
+        status: 'desconectado',
+        qr_code_base64: '',
+        auto_resposta_ia: true,
+        updated_at: nowIso(),
+      }
+
   const [form, setForm] = useState(atual)
   const [countdown, setCountdown] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -86,7 +92,9 @@ export function Whatsapp() {
     save({ status: 'desconectado', qr_code_base64: '' })
   }
 
-  const qrImagem = atual.qr_code_base64.startsWith('data:image')
+  // 🔧 CORREÇÃO PRINCIPAL: nunca chama startsWith em null/undefined
+  const qrCode = atual.qr_code_base64 || ''
+  const qrImagem = qrCode.startsWith('data:image')
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-8">
@@ -189,9 +197,9 @@ export function Whatsapp() {
               <div className={cn('rounded-xl bg-foreground p-4 transition-opacity', countdown === 0 && 'opacity-30')}>
                 {qrImagem ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={atual.qr_code_base64} alt="QR Code de pareamento do WhatsApp" width={200} height={200} />
+                  <img src={qrCode} alt="QR Code de pareamento do WhatsApp" width={200} height={200} />
                 ) : (
-                  <QRCodeSVG value={atual.qr_code_base64 || 'atendeai'} size={200} />
+                  <QRCodeSVG value={qrCode || 'atendeai'} size={200} />
                 )}
               </div>
               <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">Abra o WhatsApp no celular, vá em Aparelhos conectados, toque em Conectar aparelho e aponte para este código.</p>
